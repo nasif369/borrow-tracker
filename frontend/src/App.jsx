@@ -113,7 +113,7 @@ function App() {
     const fetchDebts = async (token) => {
         try {
             const response = await fetch(
-                "${API_URL}/api/debts",
+                `${API_URL}/api/debts`,
                 {
                     method: "GET",
                     headers: {
@@ -142,7 +142,7 @@ function App() {
 
         try {
             const response = await fetch(
-                "${API_URL}/api/debts",
+                `${API_URL}/api/debts`,
                 {
                     method: "POST",
                     headers: {
