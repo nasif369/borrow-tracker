@@ -17,3 +17,11 @@ input {
 button {
     cursor: pointer;
 }
+.app-footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 16px 0;
+    font-size: 12px;
+    color: #9aa0a6;
+    letter-spacing: 0.2px;
+}

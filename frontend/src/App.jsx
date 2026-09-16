@@ -1232,5 +1232,7 @@ const messageStyle = {
     color: "#2563eb",
     fontSize: "14px"
 };
-
+<footer className="app-footer">
+    Built by Nasif · Contact: nasiftk5j@gmail.com
+</footer>
 export default App;
