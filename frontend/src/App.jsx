@@ -1,3 +1,5 @@
+const API_URL = import.meta.env.VITE_API_URL || "${API_URL}";
+
 import { useEffect, useState } from "react";
 
 function App() {
@@ -36,7 +38,7 @@ function App() {
 
         try {
             const response = await fetch(
-                "http://localhost:5000/api/auth/register",
+                `${API_URL}/api/auth/register`,
                 {
                     method: "POST",
                     headers: {
@@ -75,7 +77,7 @@ function App() {
 
         try {
             const response = await fetch(
-                "http://localhost:5000/api/auth/login",
+                `${API_URL}/api/auth/login`,
                 {
                     method: "POST",
                     headers: {
@@ -111,7 +113,7 @@ function App() {
     const fetchDebts = async (token) => {
         try {
             const response = await fetch(
-                "http://localhost:5000/api/debts",
+                "${API_URL}/api/debts",
                 {
                     method: "GET",
                     headers: {
@@ -140,7 +142,7 @@ function App() {
 
         try {
             const response = await fetch(
-                "http://localhost:5000/api/debts",
+                "${API_URL}/api/debts",
                 {
                     method: "POST",
                     headers: {
@@ -215,7 +217,7 @@ function App() {
 
         try {
             const response = await fetch(
-                `http://localhost:5000/api/debts/${editingDebtId}`,
+                `${API_URL}/api/debts/${editingDebtId}`,
                 {
                     method: "PATCH",
                     headers: {
@@ -258,7 +260,7 @@ function App() {
 
         try {
             const response = await fetch(
-                `http://localhost:5000/api/debts/${debtId}/request-payment`,
+                `${API_URL}/api/debts/${debtId}/request-payment`,
                 {
                     method: "PATCH",
                     headers: {
@@ -287,7 +289,7 @@ function App() {
 
         try {
             const response = await fetch(
-                `http://localhost:5000/api/debts/${debtId}/confirm-payment`,
+                `${API_URL}/api/debts/${debtId}/confirm-payment`,
                 {
                     method: "PATCH",
                     headers: {
@@ -324,7 +326,7 @@ function App() {
 
         try {
             const response = await fetch(
-                `http://localhost:5000/api/debts/${debtId}`,
+                `${API_URL}/api/debts/${debtId}`,
                 {
                     method: "DELETE",
                     headers: {
@@ -853,6 +855,10 @@ function App() {
                         Logout
                     </button>
 
+                    <footer className="app-footer">
+                            Built by Nasif · Contact: nasiftk5j@gmail.com
+                        </footer>
+
                 </div>
             </div>
         );
@@ -933,6 +939,10 @@ function App() {
                         Already have an account? Login
                     </button>
 
+                    <footer className="app-footer">
+                            Built by Nasif · Contact: nasiftk5j@gmail.com
+                        </footer>
+
                 </div>
 
             </div>
@@ -1011,6 +1021,10 @@ function App() {
                 >
                     Create a new account
                 </button>
+
+                <footer className="app-footer">
+                            Built by Nasif · Contact: nasiftk5j@gmail.com
+                        </footer>
 
             </div>
 
@@ -1232,7 +1246,4 @@ const messageStyle = {
     color: "#2563eb",
     fontSize: "14px"
 };
-<footer className="app-footer">
-    Built by Nasif · Contact: nasiftk5j@gmail.com
-</footer>
 export default App;
