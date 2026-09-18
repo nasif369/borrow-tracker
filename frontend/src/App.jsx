@@ -1,6 +1,6 @@
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
-
 import { useEffect, useState } from "react";
+
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
 function App() {
     const [isRegistering, setIsRegistering] = useState(false);
@@ -15,8 +15,15 @@ function App() {
 
     const [debtType, setDebtType] = useState("borrowed");
     const [personRollNumber, setPersonRollNumber] = useState("");
+    const [selectedUser, setSelectedUser] = useState(null);
     const [amount, setAmount] = useState("");
     const [description, setDescription] = useState("");
+
+    // USER SEARCH
+    const [userSearch, setUserSearch] = useState("");
+    const [users, setUsers] = useState([]);
+    const [showUserList, setShowUserList] = useState(false);
+    const [searchingUsers, setSearchingUsers] = useState(false);
 
     // EDIT MODE
     const [editingDebtId, setEditingDebtId] = useState(null);
@@ -134,11 +141,94 @@ function App() {
         }
     };
 
+    // SEARCH / LOAD USERS
+    const fetchUsers = async (searchText = "") => {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            return;
+        }
+
+        setSearchingUsers(true);
+
+        try {
+            const url = searchText.trim()
+                ? `${API_URL}/api/users/search?q=${encodeURIComponent(searchText.trim())}`
+                : `${API_URL}/api/users/search`;
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setUsers(data.users || []);
+            } else if (response.status === 401) {
+                handleLogout();
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            console.error(error);
+            setUsers([]);
+        } finally {
+            setSearchingUsers(false);
+        }
+    };
+
+    // OPEN USER LIST
+    const handleOpenUserList = () => {
+        setShowUserList(true);
+
+        if (users.length === 0) {
+            fetchUsers(userSearch);
+        }
+    };
+
+    // SEARCH USERS AS USER TYPES
+    const handleUserSearchChange = (e) => {
+        const value = e.target.value;
+
+        setUserSearch(value);
+        setShowUserList(true);
+        setSelectedUser(null);
+        setPersonRollNumber("");
+
+        fetchUsers(value);
+    };
+
+    // SELECT USER
+    const handleSelectUser = (user) => {
+        setSelectedUser(user);
+        setPersonRollNumber(user.rollNumber);
+        setUserSearch(`${user.name} (${user.rollNumber})`);
+        setShowUserList(false);
+        setMessage("");
+    };
+
+    // CLEAR USER SELECTION
+    const clearUserSelection = () => {
+        setSelectedUser(null);
+        setPersonRollNumber("");
+        setUserSearch("");
+        setShowUserList(true);
+        fetchUsers("");
+    };
+
     // CREATE DEBT
     const handleCreateDebt = async (e) => {
         e.preventDefault();
 
         const token = localStorage.getItem("token");
+
+        if (!selectedUser) {
+            setMessage("Please select a person first.");
+            return;
+        }
 
         try {
             const response = await fetch(
@@ -164,8 +254,11 @@ function App() {
                 setMessage("Debt created successfully!");
 
                 setPersonRollNumber("");
+                setSelectedUser(null);
+                setUserSearch("");
                 setAmount("");
                 setDescription("");
+                setShowUserList(false);
 
                 await fetchDebts(token);
             } else {
@@ -188,25 +281,43 @@ function App() {
 
         if (isBorrower) {
             setDebtType("borrowed");
+
+            setSelectedUser(debt.lender);
+
             setPersonRollNumber(debt.lender.rollNumber);
+
+            setUserSearch(
+                `${debt.lender.name} (${debt.lender.rollNumber})`
+            );
         } else {
             setDebtType("lent");
+
+            setSelectedUser(debt.borrower);
+
             setPersonRollNumber(debt.borrower.rollNumber);
+
+            setUserSearch(
+                `${debt.borrower.name} (${debt.borrower.rollNumber})`
+            );
         }
 
         setAmount(String(debt.amount));
         setDescription(debt.description || "");
         setMessage("");
+        setShowUserList(false);
     };
 
     // CANCEL EDIT
     const handleCancelEdit = () => {
         setEditingDebtId(null);
         setPersonRollNumber("");
+        setSelectedUser(null);
+        setUserSearch("");
         setAmount("");
         setDescription("");
         setDebtType("borrowed");
         setMessage("");
+        setShowUserList(false);
     };
 
     // UPDATE DEBT
@@ -214,6 +325,11 @@ function App() {
         e.preventDefault();
 
         const token = localStorage.getItem("token");
+
+        if (!selectedUser) {
+            setMessage("Please select a person first.");
+            return;
+        }
 
         try {
             const response = await fetch(
@@ -240,9 +356,12 @@ function App() {
 
                 setEditingDebtId(null);
                 setPersonRollNumber("");
+                setSelectedUser(null);
+                setUserSearch("");
                 setAmount("");
                 setDescription("");
                 setDebtType("borrowed");
+                setShowUserList(false);
 
                 await fetchDebts(token);
             } else {
@@ -357,6 +476,10 @@ function App() {
         setLoggedIn(false);
         setDebts([]);
         setMessage("");
+        setUsers([]);
+        setSelectedUser(null);
+        setPersonRollNumber("");
+        setUserSearch("");
     };
 
     // DASHBOARD
@@ -531,19 +654,96 @@ function App() {
                             }
                         >
 
-                            <input
-                                type="text"
-                                placeholder={
-                                    debtType === "borrowed"
-                                        ? "Lender Roll Number"
-                                        : "Borrower Roll Number"
-                                }
-                                value={personRollNumber}
-                                onChange={(e) =>
-                                    setPersonRollNumber(e.target.value)
-                                }
-                                style={inputStyle}
-                            />
+                            {/* USER SEARCH */}
+
+                            <div style={{
+                                position: "relative",
+                                marginBottom: "14px"
+                            }}>
+
+                                <input
+                                    type="text"
+                                    placeholder={
+                                        debtType === "borrowed"
+                                            ? "Search lender by name or roll number"
+                                            : "Search borrower by name or roll number"
+                                    }
+                                    value={userSearch}
+                                    onFocus={handleOpenUserList}
+                                    onChange={handleUserSearchChange}
+                                    style={{
+                                        ...inputStyle,
+                                        marginBottom: 0,
+                                        paddingRight: selectedUser
+                                            ? "85px"
+                                            : "12px"
+                                    }}
+                                />
+
+                                {selectedUser && (
+                                    <button
+                                        type="button"
+                                        onClick={clearUserSelection}
+                                        style={{
+                                            position: "absolute",
+                                            right: "8px",
+                                            top: "8px",
+                                            padding: "6px 10px",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            background: "#e5e7eb",
+                                            color: "#333",
+                                            cursor: "pointer"
+                                        }}
+                                    >
+                                        Change
+                                    </button>
+                                )}
+
+                                {showUserList && (
+                                    <div style={userListStyle}>
+
+                                        {searchingUsers ? (
+                                            <p style={userListMessageStyle}>
+                                                Searching...
+                                            </p>
+                                        ) : users.length === 0 ? (
+                                            <p style={userListMessageStyle}>
+                                                No users found.
+                                            </p>
+                                        ) : (
+                                            users.map((person) => (
+                                                <button
+                                                    key={person._id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleSelectUser(person)
+                                                    }
+                                                    style={userItemStyle}
+                                                >
+                                                    <div style={{
+                                                        fontWeight: "bold",
+                                                        fontSize: "15px"
+                                                    }}>
+                                                        {person.name}
+                                                    </div>
+
+                                                    <div style={{
+                                                        color: "#666",
+                                                        fontSize: "13px",
+                                                        marginTop: "3px"
+                                                    }}>
+                                                        {person.rollNumber}
+                                                    </div>
+                                                </button>
+                                            ))
+                                        )}
+
+                                    </div>
+                                )}
+
+                            </div>
+
 
                             <input
                                 type="number"
@@ -856,8 +1056,8 @@ function App() {
                     </button>
 
                     <footer className="app-footer">
-                            Built by Nasif · Contact: nasiftk5j@gmail.com
-                        </footer>
+                        Built by Nasif · Contact: nasiftk5j@gmail.com
+                    </footer>
 
                 </div>
             </div>
@@ -940,8 +1140,8 @@ function App() {
                     </button>
 
                     <footer className="app-footer">
-                            Built by Nasif · Contact: nasiftk5j@gmail.com
-                        </footer>
+                        Built by Nasif · Contact: nasiftk5j@gmail.com
+                    </footer>
 
                 </div>
 
@@ -976,7 +1176,7 @@ function App() {
 
                     <input
                         type="text"
-                        placeholder="Roll Number"
+                        placeholder="Roll Number eg:- 2025BCD0012"
                         value={rollNumber}
                         onChange={(e) =>
                             setRollNumber(e.target.value)
@@ -1023,8 +1223,9 @@ function App() {
                 </button>
 
                 <footer className="app-footer">
-                            Built by Nasif · Contact: nasiftk5j@gmail.com
-                        </footer>
+                    Built by Nasif · Contact: nasiftk5j@gmail.com
+                </footer>
+                
 
             </div>
 
@@ -1165,6 +1366,39 @@ const typeButtonStyle = {
     cursor: "pointer"
 };
 
+// USER SEARCH LIST
+
+const userListStyle = {
+    position: "absolute",
+    top: "calc(100% + 4px)",
+    left: 0,
+    right: 0,
+    background: "#ffffff",
+    border: "1px solid #d1d5db",
+    borderRadius: "8px",
+    boxShadow: "0 5px 15px rgba(0,0,0,0.12)",
+    maxHeight: "260px",
+    overflowY: "auto",
+    zIndex: 100
+};
+
+const userItemStyle = {
+    width: "100%",
+    padding: "12px 14px",
+    border: "none",
+    borderBottom: "1px solid #eeeeee",
+    background: "#ffffff",
+    textAlign: "left",
+    cursor: "pointer"
+};
+
+const userListMessageStyle = {
+    padding: "15px",
+    margin: 0,
+    color: "#777",
+    textAlign: "center"
+};
+
 const payButtonStyle = {
     padding: "9px 16px",
     border: "none",
@@ -1246,4 +1480,5 @@ const messageStyle = {
     color: "#2563eb",
     fontSize: "14px"
 };
+
 export default App;
