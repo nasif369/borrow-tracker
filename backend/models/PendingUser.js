@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const userSchema = new mongoose.Schema({
+const pendingUserSchema = new mongoose.Schema({
     rollNumber: {
         type: String,
         required: true,
@@ -23,20 +23,21 @@ const userSchema = new mongoose.Schema({
         required: true
     },
 
-    emailVerified: {
-        type: Boolean,
-        default: false
-    },
-
     verificationCode: {
         type: String,
-        default: null
+        required: true
     },
 
     verificationCodeExpires: {
         type: Date,
-        default: null
+        required: true
+    },
+
+    createdAt: {
+        type: Date,
+        default: Date.now,
+        expires: 86400
     }
 });
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.model("PendingUser", pendingUserSchema);

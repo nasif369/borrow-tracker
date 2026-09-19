@@ -7,9 +7,18 @@ function App() {
 
     const [name, setName] = useState("");
     const [rollNumber, setRollNumber] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+    const [verificationCode, setVerificationCode] = useState("");
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+    const [isResendingOtp, setIsResendingOtp] = useState(false);
 
+ 
     const [message, setMessage] = useState("");
+    const [messageType, setMessageType] = useState("");
     const [loggedIn, setLoggedIn] = useState(false);
     const [debts, setDebts] = useState([]);
 
@@ -42,6 +51,7 @@ function App() {
     // REGISTER
     const handleRegister = async (e) => {
         e.preventDefault();
+        setIsSendingOtp(true);
 
         try {
             const response = await fetch(
@@ -54,6 +64,7 @@ function App() {
                     body: JSON.stringify({
                         name: name.trim(),
                         rollNumber: rollNumber.trim(),
+                        email: email.trim(),
                         password: password
                     })
                 }
@@ -62,25 +73,117 @@ function App() {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage("Registration successful! You can now login.");
-
-                setName("");
-                setRollNumber("");
-                setPassword("");
-
-                setIsRegistering(false);
+                setIsSendingOtp(false);
+                setMessage(
+                    `Verification OTP sent to ${email.trim()}. Check your email if not found please check junk/spam folder.`
+                );
+                setMessageType("success");
+                setIsVerifyingEmail(true);
+                setVerificationCode("");
             } else {
+                setIsSendingOtp(false);
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
+            setIsSendingOtp(false);
             console.error(error);
             setMessage("Could not connect to server");
+            setMessageType("error");
+        }
+    };
+
+    // VERIFY EMAIL
+    const handleVerifyEmail = async (e) => {
+        e.preventDefault();
+        setIsVerifyingOtp(true);
+
+        try {
+            const response = await fetch(
+                `${API_URL}/api/auth/verify-email`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        email: email.trim(),
+                        verificationCode: verificationCode.trim()
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setIsVerifyingOtp(false);
+                setMessage("Email verified successfully! You can now login.");
+                setMessageType("success");
+                setIsVerifyingEmail(false);
+                setIsRegistering(false);
+                setName("");
+                setRollNumber("");
+                setEmail("");
+                setPassword("");
+                setVerificationCode("");
+            } else {
+                setIsVerifyingOtp(false);
+                setMessage(data.message);
+                setMessageType("error");
+            }
+        } catch (error) {
+            setIsVerifyingOtp(false);
+            console.error(error);
+            setMessage("Could not connect to server");
+            setMessageType("error");
+        }
+    };
+
+
+    // RESEND OTP
+    const handleResendOtp = async () => {
+        setIsResendingOtp(true);
+        try {
+            setMessage("Sending a new OTP...");
+            setMessageType("info");
+
+            const response = await fetch(
+                `${API_URL}/api/auth/resend-otp`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        email: email.trim()
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                   setIsResendingOtp(false);
+                   setMessage("A new OTP has been sent to your email.");
+                   setMessageType("success");
+                   setVerificationCode("");
+            } else {
+                setIsResendingOtp(false);
+                setMessage(data.message);
+                setMessageType("error");
+            }
+        } catch (error) {
+            setIsResendingOtp(false);
+            console.error(error);
+            setMessage("Could not connect to server");
+            setMessageType("error");
         }
     };
 
     // LOGIN
     const handleLogin = async (e) => {
         e.preventDefault();
+         setIsLoggingIn(true);
 
         try {
             const response = await fetch(
@@ -100,19 +203,25 @@ function App() {
             const data = await response.json();
 
             if (response.ok) {
+                setIsLoggingIn(false);
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
 
                 setLoggedIn(true);
                 setMessage("");
+                setMessageType("");
 
                 await fetchDebts(data.token);
             } else {
+                setIsLoggingIn(false);
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
+            setIsLoggingIn(false);
             console.error(error);
             setMessage("Could not connect to server");
+            setMessageType("error");
         }
     };
 
@@ -208,6 +317,7 @@ function App() {
         setUserSearch(`${user.name} (${user.rollNumber})`);
         setShowUserList(false);
         setMessage("");
+                setMessageType("");
     };
 
     // CLEAR USER SELECTION
@@ -227,6 +337,7 @@ function App() {
 
         if (!selectedUser) {
             setMessage("Please select a person first.");
+            setMessageType("error");
             return;
         }
 
@@ -252,6 +363,7 @@ function App() {
 
             if (response.ok) {
                 setMessage("Debt created successfully!");
+                setMessageType("success");
 
                 setPersonRollNumber("");
                 setSelectedUser(null);
@@ -263,10 +375,12 @@ function App() {
                 await fetchDebts(token);
             } else {
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
             console.error(error);
             setMessage("Could not create debt");
+            setMessageType("error");
         }
     };
 
@@ -304,6 +418,7 @@ function App() {
         setAmount(String(debt.amount));
         setDescription(debt.description || "");
         setMessage("");
+                setMessageType("");
         setShowUserList(false);
     };
 
@@ -317,6 +432,7 @@ function App() {
         setDescription("");
         setDebtType("borrowed");
         setMessage("");
+                setMessageType("");
         setShowUserList(false);
     };
 
@@ -328,6 +444,7 @@ function App() {
 
         if (!selectedUser) {
             setMessage("Please select a person first.");
+            setMessageType("error");
             return;
         }
 
@@ -353,6 +470,7 @@ function App() {
 
             if (response.ok) {
                 setMessage("Debt updated successfully!");
+                setMessageType("success");
 
                 setEditingDebtId(null);
                 setPersonRollNumber("");
@@ -366,10 +484,12 @@ function App() {
                 await fetchDebts(token);
             } else {
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
             console.error(error);
             setMessage("Could not update debt");
+            setMessageType("error");
         }
     };
 
@@ -392,13 +512,16 @@ function App() {
 
             if (response.ok) {
                 setMessage("Payment confirmation requested.");
+                setMessageType("success");
                 await fetchDebts(token);
             } else {
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
             console.error(error);
             setMessage("Could not request payment confirmation");
+            setMessageType("error");
         }
     };
 
@@ -421,13 +544,16 @@ function App() {
 
             if (response.ok) {
                 setMessage("Payment confirmed!");
+                setMessageType("success");
                 await fetchDebts(token);
             } else {
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
             console.error(error);
             setMessage("Could not confirm payment");
+            setMessageType("error");
         }
     };
 
@@ -458,13 +584,16 @@ function App() {
 
             if (response.ok) {
                 setMessage("Debt deleted successfully.");
+                setMessageType("success");
                 await fetchDebts(token);
             } else {
                 setMessage(data.message);
+                setMessageType("error");
             }
         } catch (error) {
             console.error(error);
             setMessage("Could not delete debt");
+            setMessageType("error");
         }
     };
 
@@ -476,6 +605,7 @@ function App() {
         setLoggedIn(false);
         setDebts([]);
         setMessage("");
+                setMessageType("");
         setUsers([]);
         setSelectedUser(null);
         setPersonRollNumber("");
@@ -607,6 +737,7 @@ function App() {
                                 onClick={() => {
                                     setDebtType("borrowed");
                                     setMessage("");
+                setMessageType("");
                                 }}
                                 style={{
                                     ...typeButtonStyle,
@@ -628,6 +759,7 @@ function App() {
                                 onClick={() => {
                                     setDebtType("lent");
                                     setMessage("");
+                setMessageType("");
                                 }}
                                 style={{
                                     ...typeButtonStyle,
@@ -792,11 +924,21 @@ function App() {
 
                     {/* MESSAGE */}
 
-                    {message && (
-                        <div style={messageCardStyle}>
-                            {message}
-                        </div>
-                    )}
+                  {message && (
+    <p
+        style={{
+            ...messageStyle,
+            color:
+                messageType === "error"
+                    ? "#dc2626"
+                    : messageType === "success"
+                    ? "#16a34a"
+                    : "#2563eb"
+        }}
+    >
+        {message}
+    </p>
+)}
 
 
                     {/* ACTIVE DEBTS */}
@@ -1073,71 +1215,230 @@ function App() {
             <div style={pageStyle}>
 
                 <div style={cardStyle}>
+                    <style>{`
+                        @keyframes borrowTrackerSpin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                    `}</style>
 
                     <h1 style={titleStyle}>
                         Borrow Tracker
                     </h1>
 
                     <h2>
-                        Create Account
+                        {isVerifyingEmail ? "Verify Your Email" : "Create Account"}
                     </h2>
 
-                    <form onSubmit={handleRegister}>
+                    {!isVerifyingEmail ? (
+                        <>
+                            <form onSubmit={handleRegister}>
 
-                        <input
-                            type="text"
-                            placeholder="Name"
-                            value={name}
-                            onChange={(e) =>
-                                setName(e.target.value)
-                            }
-                            style={inputStyle}
-                        />
+                                <input
+                                    type="text"
+                                    placeholder="Name"
+                                    value={name}
+                                    onChange={(e) =>{
+                                   setName(e.target.value)
+                                          setMessage("");
+                                          setMessageType(""); 
+                                    }
+                                     
+                                         
+                                    }
+                                    style={inputStyle}
+                                />
 
-                        <input
-                            type="text"
-                            placeholder="Roll Number"
-                            value={rollNumber}
-                            onChange={(e) =>
-                                setRollNumber(e.target.value)
-                            }
-                            style={inputStyle}
-                        />
+                                <input
+                                    type="text"
+                                    placeholder="Roll Number eg:- 2025BCD0012"
+                                    value={rollNumber}
+                                    onChange={(e) =>{
+                                        setRollNumber(e.target.value)
+                                        setMessage("");
+                                        setMessageType("");
+                                    }
+                                       
+                                    }
+                                    style={inputStyle}
+                                />
 
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) =>
-                                setPassword(e.target.value)
-                            }
-                            style={inputStyle}
-                        />
+                                <input
+                                    type="email"
+                                    placeholder="Email Address"
+                                    value={email}
+                                    onChange={(e) =>{
+                                        setEmail(e.target.value)
+                                        setMessage("");
+                                        setMessageType("");
+                                    }
+                                       
+                                    }
+                                    style={inputStyle}
+                                />
 
-                        <button
-                            type="submit"
-                            style={primaryButtonStyle}
-                        >
-                            Register
-                        </button>
+                                <input
+                                    type="password"
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) =>{
+                                        setPassword(e.target.value)
+                                        setMessage("");
+                                        setMessageType("");
+                                    }
+                                        
+                                    }
+                                    style={inputStyle}
+                                />
 
-                    </form>
+                                <button
+                                    type="submit"
+                                    disabled={isSendingOtp}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        opacity: isSendingOtp ? 0.8 : 1,
+                                        cursor: isSendingOtp ? "not-allowed" : "pointer"
+                                    }}
+                                >
+                                    {isSendingOtp ? (
+                                        <span style={loadingContentStyle}>
+                                            <span style={spinnerStyle}></span>
+                                            Sending OTP...
+                                        </span>
+                                    ) : (
+                                        "Send Verification OTP"
+                                    )}
+                                </button>
+
+                            </form>
+                        </>
+                    ) : (
+                        <>
+                            <p style={{
+                                color: "#666",
+                                fontSize: "14px",
+                                marginTop: 0
+                            }}>
+                                We sent a 6-digit OTP to <strong>{email}</strong>.
+                            </p>
+
+                            <form onSubmit={handleVerifyEmail}>
+
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength="6"
+                                    placeholder="Enter 6-digit OTP"
+                                    value={verificationCode}
+                                    onChange={(e) => {
+                                        setVerificationCode(
+                                            e.target.value.replace(/\D/g, "")
+                                        );
+                                        setMessage("");
+                                        setMessageType("");
+                                    }}
+                                    style={inputStyle}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isVerifyingOtp}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        opacity: isVerifyingOtp ? 0.8 : 1,
+                                        cursor: isVerifyingOtp ? "not-allowed" : "pointer"
+                                    }}
+                                >
+                                    {isVerifyingOtp ? (
+                                        <span style={loadingContentStyle}>
+                                            <span style={spinnerStyle}></span>
+                                            Verifying...
+                                        </span>
+                                    ) : (
+                                        "Verify Email"
+                                    )}
+                                </button>
+
+                            </form>
+
+                            <button
+                                type="button"
+                                onClick={handleResendOtp}
+                                disabled={isResendingOtp}
+                                style={{
+                                    ...secondaryButtonStyle,
+                                    opacity: isResendingOtp ? 0.7 : 1,
+                                    cursor: isResendingOtp ? "not-allowed" : "pointer"
+                                }}
+                            >
+                                {isResendingOtp ? (
+                                    <span style={loadingContentStyle}>
+                                        <span style={smallSpinnerStyle}></span>
+                                        Sending...
+                                    </span>
+                                ) : (
+                                    "Resend OTP"
+                                )}
+                            </button>
+<button
+    type="button"
+    onClick={() => {
+        setIsVerifyingEmail(false);
+        setVerificationCode("");
+        setMessage("");
+                setMessageType("");
+    }}
+    style={secondaryButtonStyle}
+>
+    Change Email
+</button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsVerifyingEmail(false);
+                                    setMessage("");
+                setMessageType("");
+                                }}
+                                style={secondaryButtonStyle}
+                            >
+                                Back to Registration
+                            </button>
+                        </>
+                    )}
 
                     {message && (
-                        <p style={messageStyle}>
+                        <p
+                            style={{
+                                ...messageStyle,
+                                color:
+                                    messageType === "error"
+                                        ? "#dc2626"
+                                        : messageType === "success"
+                                        ? "#16a34a"
+                                        : "#2563eb"
+                            }}
+                        >
                             {message}
                         </p>
                     )}
 
-                    <button
-                        onClick={() => {
-                            setIsRegistering(false);
-                            setMessage("");
-                        }}
-                        style={secondaryButtonStyle}
-                    >
-                        Already have an account? Login
-                    </button>
+                    {!isVerifyingEmail && (
+                        <button
+                            onClick={() => {
+                                setIsRegistering(false);
+                                setMessage("");
+                setMessageType("");
+                                setName("");
+                                setRollNumber("");
+                                setEmail("");
+                                setPassword("");
+                                setVerificationCode("");
+                            }}
+                            style={secondaryButtonStyle}
+                        >
+                            Already have an account? Login
+                        </button>
+                    )}
 
                     <footer className="app-footer">
                         Built by Nasif · Contact: nasiftk5j@gmail.com
@@ -1178,9 +1479,11 @@ function App() {
                         type="text"
                         placeholder="Roll Number eg:- 2025BCD0012"
                         value={rollNumber}
-                        onChange={(e) =>
-                            setRollNumber(e.target.value)
-                        }
+                        onChange={(e) => {
+                            setRollNumber(e.target.value);
+                            setMessage("");
+                            setMessageType("");
+                        }}
                         style={inputStyle}
                     />
 
@@ -1188,17 +1491,31 @@ function App() {
                         type="password"
                         placeholder="Password"
                         value={password}
-                        onChange={(e) =>
-                            setPassword(e.target.value)
-                        }
+                        onChange={(e) => {
+                            setPassword(e.target.value);
+                            setMessage("");
+                            setMessageType("");
+                        }}
                         style={inputStyle}
                     />
 
                     <button
                         type="submit"
-                        style={primaryButtonStyle}
+                        disabled={isLoggingIn}
+                        style={{
+                            ...primaryButtonStyle,
+                            opacity: isLoggingIn ? 0.8 : 1,
+                            cursor: isLoggingIn ? "not-allowed" : "pointer"
+                        }}
                     >
-                        Login
+                        {isLoggingIn ? (
+                            <span style={loadingContentStyle}>
+                                <span style={spinnerStyle}></span>
+                                Logging in...
+                            </span>
+                        ) : (
+                            "Login"
+                        )}
                     </button>
 
                 </form>
@@ -1213,9 +1530,13 @@ function App() {
                     onClick={() => {
                         setIsRegistering(true);
                         setMessage("");
+                setMessageType("");
                         setName("");
                         setRollNumber("");
+                        setEmail("");
                         setPassword("");
+                        setVerificationCode("");
+                        setIsVerifyingEmail(false);
                     }}
                     style={secondaryButtonStyle}
                 >
@@ -1225,8 +1546,78 @@ function App() {
                 <footer className="app-footer">
                     Built by Nasif · Contact: nasiftk5j@gmail.com
                 </footer>
-                
 
+            </div>
+
+            {/* SOCIAL FOOTER - OUTSIDE LOGIN CARD */}
+            <div
+                style={{
+                    width: "100%",
+                    maxWidth: "420px",
+                    background: "#ffffff",
+                    padding: "18px 20px",
+                    borderRadius: "10px",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+                    textAlign: "center"
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "30px"
+                    }}
+                >
+                    <a
+                        href="https://www.linkedin.com/in/mohammed-nasif-t-k-8928b5380/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "7px",
+                            color: "#333",
+                            textDecoration: "none",
+                            fontSize: "14px"
+                        }}
+                    >
+                        <span
+                            style={{
+                                fontWeight: "bold",
+                                fontSize: "20px",
+                                lineHeight: 1
+                            }}
+                        >
+                            in
+                        </span>
+                        <span>Mohammed Nasif</span>
+                    </a>
+
+                    <a
+                        href="https://github.com/nasif369"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "7px",
+                            color: "#333",
+                            textDecoration: "none",
+                            fontSize: "14px"
+                        }}
+                    >
+                        <span
+                            style={{
+                                fontSize: "20px",
+                                lineHeight: 1
+                            }}
+                        >
+                            ◉
+                        </span>
+                        <span>nasif369</span>
+                    </a>
+                </div>
             </div>
 
         </div>
@@ -1240,9 +1631,11 @@ const pageStyle = {
     minHeight: "100vh",
     background: "#f4f6f8",
     display: "flex",
+    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    padding: "20px"
+    padding: "20px",
+    gap: "20px"
 };
 
 const dashboardPageStyle = {
@@ -1331,6 +1724,31 @@ const inputStyle = {
     borderRadius: "8px",
     fontSize: "15px",
     outline: "none"
+};
+
+const loadingContentStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px"
+};
+
+const spinnerStyle = {
+    width: "16px",
+    height: "16px",
+    border: "2px solid rgba(255,255,255,0.45)",
+    borderTop: "2px solid #ffffff",
+    borderRadius: "50%",
+    animation: "borrowTrackerSpin 0.8s linear infinite"
+};
+
+const smallSpinnerStyle = {
+    width: "14px",
+    height: "14px",
+    border: "2px solid #d1d5db",
+    borderTop: "2px solid #2563eb",
+    borderRadius: "50%",
+    animation: "borrowTrackerSpin 0.8s linear infinite"
 };
 
 const primaryButtonStyle = {
@@ -1468,7 +1886,7 @@ const paidStatusStyle = {
 
 const logoutButtonStyle = {
     padding: "10px 20px",
-    border: "none",
+    border: "none", 
     borderRadius: "8px",
     background: "#dc2626",
     color: "#ffffff",
@@ -1477,8 +1895,9 @@ const logoutButtonStyle = {
 };
 
 const messageStyle = {
-    color: "#2563eb",
-    fontSize: "14px"
+    marginTop: "15px",
+    fontSize: "14px",
+    lineHeight: "1.5",
+    textAlign: "center"
 };
-
 export default App;
