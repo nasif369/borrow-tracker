@@ -48,6 +48,11 @@ router.post("/register", async (req, res) => {
             return res.status(400).json({
                 message: "All fields are required"
             });
+            if (password.length < 4) {
+    return res.status(400).json({
+        message: "Password must be at least 4 characters"
+    });
+}
         }
 
         const cleanName = name.trim();
@@ -448,5 +453,229 @@ router.post("/login", async (req, res) => {
     }
 });
 
+// FORGOT PASSWORD - SEND RESET OTP
+router.post("/forgot-password", async (req, res) => {
+    try {
+        const { rollNumber } = req.body;
+
+        if (!rollNumber || !rollNumber.trim()) {
+            return res.status(400).json({
+                message: "Roll number is required"
+            });
+        }
+
+        const cleanRollNumber = rollNumber.trim().toUpperCase();
+
+        const user = await User.findOne({
+            rollNumber: cleanRollNumber
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "No account found with this roll number."
+            });
+        }
+
+        if (!user.emailVerified) {
+            return res.status(400).json({
+                message: "This account has not been verified."
+            });
+        }
+
+        // Generate 6-digit OTP
+        const resetCode = Math.floor(
+            100000 + Math.random() * 900000
+        ).toString();
+
+        // OTP expires in 10 minutes
+        user.resetPasswordCode = resetCode;
+        user.resetPasswordCodeExpires =
+            new Date(Date.now() + 10 * 60 * 1000);
+
+        await user.save();
+
+        // Send OTP to registered email
+       await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: "Borrow Tracker - Password Reset OTP",
+    text: `Your Borrow Tracker password reset OTP is ${resetCode}. It will expire in 10 minutes.`,
+
+    html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+            <h2>Borrow Tracker</h2>
+
+            <p>You requested to reset your password.</p>
+
+            <p>Your password reset OTP is:</p>
+
+            <div style="
+                font-size: 32px;
+                font-weight: bold;
+                letter-spacing: 8px;
+                margin: 20px 0;
+            ">
+                ${resetCode}
+            </div>
+
+            <p>This OTP will expire in <strong>10 minutes</strong>.</p>
+
+            <p>If you did not request a password reset, please ignore this email.</p>
+        </div>
+    `
+});
+
+        // Mask email before sending it to frontend
+        const [emailName, emailDomain] =
+            user.email.split("@");
+
+        let maskedEmail;
+
+        if (emailName.length <= 4) {
+            maskedEmail =
+                `${emailName[0]}***@${emailDomain}`;
+        } else {
+            maskedEmail =
+                `${emailName.slice(0, 2)}***${emailName.slice(-2)}@${emailDomain}`;
+        }
+
+        res.json({
+            message: "OTP sent successfully.",
+            maskedEmail: maskedEmail
+        });
+
+    } catch (error) {
+        console.error("Forgot password error:", error);
+
+        res.status(500).json({
+            message: "Could not send password reset OTP."
+        });
+    }
+});
+// VERIFY PASSWORD RESET OTP
+router.post("/verify-reset-otp", async (req, res) => {
+    try {
+        const { rollNumber, verificationCode } = req.body;
+
+        if (!rollNumber || !verificationCode) {
+            return res.status(400).json({
+                message: "Roll number and OTP are required"
+            });
+        }
+
+        const cleanRollNumber = rollNumber.trim().toUpperCase();
+        const cleanCode = verificationCode.trim();
+
+        const user = await User.findOne({
+            rollNumber: cleanRollNumber
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "No account found with this roll number."
+            });
+        }
+
+        if (!user.resetPasswordCode) {
+            return res.status(400).json({
+                message: "No password reset OTP found. Please request a new OTP."
+            });
+        }
+
+        if (
+            !user.resetPasswordCodeExpires ||
+            user.resetPasswordCodeExpires < new Date()
+        ) {
+            user.resetPasswordCode = null;
+            user.resetPasswordCodeExpires = null;
+
+            await user.save();
+
+            return res.status(400).json({
+                message: "OTP has expired. Please request a new OTP."
+            });
+        }
+
+    if (user.resetPasswordCode !== cleanCode) {
+    return res.status(400).json({
+        message: "Invalid OTP."
+    });
+}
+
+user.resetPasswordVerified = true;
+user.resetPasswordCode = null;
+user.resetPasswordCodeExpires = null;
+
+await user.save();
+
+res.json({
+    message: "OTP verified successfully."
+});
+
+    } catch (error) {
+        console.error("Verify reset OTP error:", error);
+
+        res.status(500).json({
+            message: "Could not verify OTP."
+        });
+    }
+});
+// RESET PASSWORD
+router.post("/reset-password", async (req, res) => {
+    try {
+        const { rollNumber, newPassword } = req.body;
+
+        if (!rollNumber || !newPassword) {
+            return res.status(400).json({
+                message: "Roll number and new password are required"
+            });
+        }
+
+        if (newPassword.length < 4) {
+            return res.status(400).json({
+                message: "Password must be at least 4 characters"
+            });
+        }
+
+        const cleanRollNumber = rollNumber.trim().toUpperCase();
+
+        const user = await User.findOne({
+            rollNumber: cleanRollNumber
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "No account found with this roll number."
+            });
+        }
+
+        if (!user.resetPasswordVerified) {
+            return res.status(403).json({
+                message: "Please verify the password reset OTP first."
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(
+            newPassword,
+            10
+        );
+
+        user.password = hashedPassword;
+        user.resetPasswordVerified = false;
+
+        await user.save();
+
+        res.json({
+            message: "Password reset successfully."
+        });
+
+    } catch (error) {
+        console.error("Reset password error:", error);
+
+        res.status(500).json({
+            message: "Could not reset password."
+        });
+    }
+});
 
 module.exports = router;

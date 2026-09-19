@@ -12,6 +12,18 @@ function App() {
     const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
     const [verificationCode, setVerificationCode] = useState("");
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+    // FORGOT PASSWORD
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
+    const [forgotStep, setForgotStep] = useState("roll");
+    const [forgotRollNumber, setForgotRollNumber] = useState("");
+    const [resetVerificationCode, setResetVerificationCode] = useState("");
+    const [maskedEmail, setMaskedEmail] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [isSendingResetOtp, setIsSendingResetOtp] = useState(false);
+    const [isVerifyingResetOtp, setIsVerifyingResetOtp] = useState(false);
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
+
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
     const [isResendingOtp, setIsResendingOtp] = useState(false);
@@ -223,6 +235,147 @@ function App() {
             setMessage("Could not connect to server");
             setMessageType("error");
         }
+    };
+
+    // FORGOT PASSWORD - SEND RESET OTP
+    const handleForgotPassword = async (e) => {
+        e.preventDefault();
+        setIsSendingResetOtp(true);
+        setMessage("");
+        setMessageType("");
+
+        try {
+            const response = await fetch(
+                `${API_URL}/api/auth/forgot-password`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        rollNumber: forgotRollNumber.trim()
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setMaskedEmail(data.maskedEmail || "your registered email");
+                setForgotStep("otp");
+                setResetVerificationCode("");
+                setMessage(`OTP sent to ${data.maskedEmail || "your registered email"}. Check your inbox and junk/spam folder.`);
+                setMessageType("success");
+            } else {
+                setMessage(data.message);
+                setMessageType("error");
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage("Could not connect to server");
+            setMessageType("error");
+        } finally {
+            setIsSendingResetOtp(false);
+        }
+    };
+
+    // VERIFY PASSWORD RESET OTP
+    const handleVerifyResetOtp = async (e) => {
+        e.preventDefault();
+        setIsVerifyingResetOtp(true);
+        setMessage("");
+        setMessageType("");
+
+        try {
+            const response = await fetch(
+                `${API_URL}/api/auth/verify-reset-otp`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        rollNumber: forgotRollNumber.trim(),
+                        verificationCode: resetVerificationCode.trim()
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setForgotStep("reset");
+                setMessage("OTP verified successfully. Set your new password.");
+                setMessageType("success");
+                setResetVerificationCode("");
+            } else {
+                setMessage(data.message);
+                setMessageType("error");
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage("Could not connect to server");
+            setMessageType("error");
+        } finally {
+            setIsVerifyingResetOtp(false);
+        }
+    };
+
+    // RESET PASSWORD
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        setIsResettingPassword(true);
+        setMessage("");
+        setMessageType("");
+
+        try {
+            const response = await fetch(
+                `${API_URL}/api/auth/reset-password`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        rollNumber: forgotRollNumber.trim(),
+                        newPassword: newPassword
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setIsForgotPassword(false);
+                setForgotStep("roll");
+                setForgotRollNumber("");
+                setResetVerificationCode("");
+                setMaskedEmail("");
+                setNewPassword("");
+                setMessage(data.message || "Password reset successfully. You can now login.");
+                setMessageType("success");
+            } else {
+                setMessage(data.message);
+                setMessageType("error");
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage("Could not connect to server");
+            setMessageType("error");
+        } finally {
+            setIsResettingPassword(false);
+        }
+    };
+
+    const handleCancelForgotPassword = () => {
+        setIsForgotPassword(false);
+        setForgotStep("roll");
+        setForgotRollNumber("");
+        setResetVerificationCode("");
+        setMaskedEmail("");
+        setNewPassword("");
+        setMessage("");
+        setMessageType("");
     };
 
     // GET DEBTS
@@ -1207,6 +1360,193 @@ function App() {
     }
 
 
+    // FORGOT PASSWORD PAGE
+    if (isForgotPassword) {
+        return (
+            <div style={pageStyle}>
+                <div style={cardStyle}>
+                    <style>{`
+                        @keyframes borrowTrackerSpin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                    `}</style>
+
+                    <h1 style={titleStyle}>Borrow Tracker</h1>
+                    <h2>Forgot Password</h2>
+
+                    {forgotStep === "roll" && (
+                        <>
+                            <p style={{ color: "#666", fontSize: "14px", marginTop: 0 }}>
+                                Enter your roll number to reset your password.
+                            </p>
+
+                            <form onSubmit={handleForgotPassword}>
+                                <input
+                                    type="text"
+                                    placeholder="Roll Number eg:- 2025BCD0012"
+                                    value={forgotRollNumber}
+                                    onChange={(e) => {
+                                        setForgotRollNumber(e.target.value);
+                                        setMessage("");
+                                        setMessageType("");
+                                    }}
+                                    style={inputStyle}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isSendingResetOtp}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        opacity: isSendingResetOtp ? 0.8 : 1,
+                                        cursor: isSendingResetOtp ? "not-allowed" : "pointer"
+                                    }}
+                                >
+                                    {isSendingResetOtp ? (
+                                        <span style={loadingContentStyle}>
+                                            <span style={spinnerStyle}></span>
+                                            Sending OTP...
+                                        </span>
+                                    ) : (
+                                        "Send OTP"
+                                    )}
+                                </button>
+                            </form>
+                        </>
+                    )}
+
+                    {forgotStep === "otp" && (
+                        <>
+                            <p style={{ color: "#666", fontSize: "14px", marginTop: 0 }}>
+                                We sent a 6-digit OTP to <strong>{maskedEmail}</strong>.
+                            </p>
+
+                            <form onSubmit={handleVerifyResetOtp}>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength="6"
+                                    placeholder="Enter 6-digit OTP"
+                                    value={resetVerificationCode}
+                                    onChange={(e) => {
+                                        setResetVerificationCode(
+                                            e.target.value.replace(/\D/g, "")
+                                        );
+                                        setMessage("");
+                                        setMessageType("");
+                                    }}
+                                    style={inputStyle}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isVerifyingResetOtp}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        opacity: isVerifyingResetOtp ? 0.8 : 1,
+                                        cursor: isVerifyingResetOtp ? "not-allowed" : "pointer"
+                                    }}
+                                >
+                                    {isVerifyingResetOtp ? (
+                                        <span style={loadingContentStyle}>
+                                            <span style={spinnerStyle}></span>
+                                            Verifying...
+                                        </span>
+                                    ) : (
+                                        "Verify OTP"
+                                    )}
+                                </button>
+                            </form>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setForgotStep("roll");
+                                    setResetVerificationCode("");
+                                    setMessage("");
+                                    setMessageType("");
+                                }}
+                                style={secondaryButtonStyle}
+                            >
+                                Change Roll Number
+                            </button>
+                        </>
+                    )}
+
+                    {forgotStep === "reset" && (
+                        <>
+                            <p style={{ color: "#666", fontSize: "14px", marginTop: 0 }}>
+                                OTP verified. Enter your new password.
+                            </p>
+
+                            <form onSubmit={handleResetPassword}>
+                                <input
+                                    type="password"
+                                    placeholder="New Password"
+                                    value={newPassword}
+                                    onChange={(e) => {
+                                        setNewPassword(e.target.value);
+                                        setMessage("");
+                                        setMessageType("");
+                                    }}
+                                    style={inputStyle}
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isResettingPassword}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        opacity: isResettingPassword ? 0.8 : 1,
+                                        cursor: isResettingPassword ? "not-allowed" : "pointer"
+                                    }}
+                                >
+                                    {isResettingPassword ? (
+                                        <span style={loadingContentStyle}>
+                                            <span style={spinnerStyle}></span>
+                                            Resetting Password...
+                                        </span>
+                                    ) : (
+                                        "Reset Password"
+                                    )}
+                                </button>
+                            </form>
+                        </>
+                    )}
+
+                    {message && (
+                        <p
+                            style={{
+                                ...messageStyle,
+                                color:
+                                    messageType === "error"
+                                        ? "#dc2626"
+                                        : messageType === "success"
+                                        ? "#16a34a"
+                                        : "#2563eb"
+                            }}
+                        >
+                            {message}
+                        </p>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={handleCancelForgotPassword}
+                        style={secondaryButtonStyle}
+                    >
+                        Back to Login
+                    </button>
+
+                    <footer className="app-footer">
+                        Built by Nasif · Contact: nasiftk5j@gmail.com
+                    </footer>
+                </div>
+            </div>
+        );
+    }
+
     // REGISTER PAGE
 
     if (isRegistering) {
@@ -1519,6 +1859,31 @@ function App() {
                     </button>
 
                 </form>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsForgotPassword(true);
+                        setForgotStep("roll");
+                        setForgotRollNumber("");
+                        setResetVerificationCode("");
+                        setMaskedEmail("");
+                        setNewPassword("");
+                        setMessage("");
+                        setMessageType("");
+                    }}
+                    style={{
+                        width: "100%",
+                        marginTop: "10px",
+                        border: "none",
+                        background: "transparent",
+                        color: "#2563eb",
+                        fontSize: "14px",
+                        cursor: "pointer"
+                    }}
+                >
+                    Forgot Password?
+                </button>
 
                 {message && (
                     <p style={messageStyle}>
