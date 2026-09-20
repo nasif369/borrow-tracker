@@ -1,7 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
+//const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
 const User = require("../models/User");
 const PendingUser = require("../models/PendingUser");
@@ -14,23 +15,37 @@ const { encrypt } = require("../utils/encryption");
 // GMAIL TRANSPORTER
 // ===============================
 
-const transporter = nodemailer.createTransport({
+/*const transporter = nodemailer.createTransport({
+
     service: "gmail",
+
     auth: {
+
         user: process.env.EMAIL_USER,
+
         pass: process.env.EMAIL_PASS
+
     }
+
 });
 
 transporter.verify((error) => {
-    if (error) {
-        console.log("Gmail transporter error:");
-        console.log(error.message);
-    } else {
-        console.log("Gmail transporter is ready!");
-    }
-});
 
+    if (error) {
+
+        console.log("Gmail transporter error:");
+
+        console.log(error.message);
+
+    } else {
+
+        console.log("Gmail transporter is ready!");
+
+    }
+
+});
+*/
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ===============================
 // REGISTER
@@ -122,8 +137,8 @@ router.post("/register", async (req, res) => {
         await pendingUser.save();
 
         try {
-          await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+       await resend.emails.send({
+    from: "Borrow Tracker <onboarding@resend.dev>",
     to: cleanEmail,
     subject: "Borrow Tracker - Email Verification",
 
@@ -145,7 +160,6 @@ router.post("/register", async (req, res) => {
         </p>
     `
 });
-
             console.log(
                 `Verification OTP sent to ${cleanEmail}`
             );
@@ -217,8 +231,8 @@ router.post("/resend-otp", async (req, res) => {
 
         await pendingUser.save();
 
-       await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+    await resend.emails.send({
+    from: "Borrow Tracker <onboarding@resend.dev>",
     to: cleanEmail,
     subject: "Borrow Tracker - New Verification OTP",
 
@@ -496,10 +510,11 @@ router.post("/forgot-password", async (req, res) => {
         await user.save();
 
         // Send OTP to registered email
-       await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+    await resend.emails.send({
+    from: "Borrow Tracker <onboarding@resend.dev>",
     to: user.email,
     subject: "Borrow Tracker - Password Reset OTP",
+
     text: `Your Borrow Tracker password reset OTP is ${resetCode}. It will expire in 10 minutes.`,
 
     html: `
