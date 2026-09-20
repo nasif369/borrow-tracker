@@ -1617,7 +1617,7 @@ const handleConnectGemini = async (e) => {
                                     lineHeight: "1.5"
                                 }}>
                                     Your debts remain stored in Borrow Tracker's
-                                    MongoDB database. Gemini does not have a
+                                    database. Gemini does not have a
                                     separate debt database.
                                 </p>
 <form onSubmit={handleConnectGemini}>
