@@ -33,6 +33,16 @@ function App() {
     const [messageType, setMessageType] = useState("");
     const [loggedIn, setLoggedIn] = useState(false);
     const [debts, setDebts] = useState([]);
+        // GEMINI AI
+    const [geminiApiKey, setGeminiApiKey] = useState("");
+    const [geminiConnected, setGeminiConnected] = useState(false);
+    const [isConnectingGemini, setIsConnectingGemini] = useState(false);
+const [aiStatus, setAiStatus] = useState("");
+const [aiStatusType, setAiStatusType] = useState("");
+    const [aiMessage, setAiMessage] = useState("");
+    const [aiMessages, setAiMessages] = useState([]);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+
 
     const [debtType, setDebtType] = useState("borrowed");
     const [personRollNumber, setPersonRollNumber] = useState("");
@@ -50,16 +60,183 @@ function App() {
     const [editingDebtId, setEditingDebtId] = useState(null);
 
     // RESTORE LOGIN
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        const user = localStorage.getItem("user");
+    // RESTORE LOGIN
+useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
 
-        if (token && user) {
-            setLoggedIn(true);
+    if (token && user) {
+        setLoggedIn(true);
+        fetchDebts(token);
+    }
+}, []);
+
+// AUTO REFRESH DEBTS
+useEffect(() => {
+    if (!loggedIn) {
+        return;
+    }
+
+    const refreshInterval = setInterval(() => {
+        const token = localStorage.getItem("token");
+
+        if (token) {
             fetchDebts(token);
         }
-    }, []);
+    }, 10000); // refresh every 10 seconds
 
+    return () => {
+        clearInterval(refreshInterval);
+    };
+}, [loggedIn]);
+    // CONNECT GEMINI
+    // CONNECT GEMINI
+const handleConnectGemini = async (e) => {
+    e.preventDefault();
+
+    const token = localStorage.getItem("token");
+
+    if (!geminiApiKey.trim()) {
+        setAiStatus("Please enter your Gemini API key.");
+        setAiStatusType("error");
+        return;
+    }
+
+    setIsConnectingGemini(true);
+    setAiStatus("");
+    setAiStatusType("");
+
+    try {
+        const response = await fetch(
+            `${API_URL}/api/auth/connect-gemini`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    apiKey: geminiApiKey.trim()
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+            setGeminiConnected(true);
+            setGeminiApiKey("");
+
+            setAiStatus(
+                "Gemini connected successfully. Your API key is now protected."
+            );
+            setAiStatusType("success");
+
+        } else {
+            setAiStatus(
+                data.message ||
+                "Could not connect Gemini."
+            );
+            setAiStatusType("error");
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        setAiStatus(
+            "Could not connect to the server."
+        );
+        setAiStatusType("error");
+
+    } finally {
+        setIsConnectingGemini(false);
+    }
+};
+
+    // AI CHAT
+    const handleAiChat = async (e) => {
+        e.preventDefault();
+
+        if (!aiMessage.trim() || isAiLoading) {
+            return;
+        }
+
+        const token = localStorage.getItem("token");
+        const userMessage = aiMessage.trim();
+
+        setAiMessages((previous) => [
+            ...previous,
+            {
+                role: "user",
+                text: userMessage
+            }
+        ]);
+
+        setAiMessage("");
+        setIsAiLoading(true);
+
+        try {
+            const response = await fetch(
+                `${API_URL}/api/ai/chat`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        message: userMessage
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+
+                setAiMessages((previous) => [
+                    ...previous,
+                    {
+                        role: "ai",
+                        text: data.message
+                    }
+                ]);
+
+                // AI-created debt has already been saved
+                // to MongoDB by the backend.
+                if (data.action === "create_debt") {
+                    await fetchDebts(token);
+                }
+
+            } else {
+
+                setAiMessages((previous) => [
+                    ...previous,
+                    {
+                        role: "ai",
+                        text:
+                            data.message ||
+                            "The AI could not process your request."
+                    }
+                ]);
+            }
+
+        } catch (error) {
+            console.error(error);
+
+            setAiMessages((previous) => [
+                ...previous,
+                {
+                    role: "ai",
+                    text:
+                        "Could not connect to the AI service."
+                }
+            ]);
+
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
     // REGISTER
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -799,6 +976,17 @@ function App() {
 
         return (
             <div style={dashboardPageStyle}>
+                <style>{`
+                    @media (max-width: 900px) {
+                        .borrow-tracker-dashboard-grid {
+                            grid-template-columns: 1fr !important;
+                        }
+
+                        .borrow-tracker-ai-column {
+                            position: static !important;
+                        }
+                    }
+                `}</style>
                 <div style={dashboardContainerStyle}>
 
                     {/* HEADER */}
@@ -822,6 +1010,17 @@ function App() {
 
                     </div>
 
+
+                    {/* MAIN DASHBOARD CONTENT */}
+
+                    <div
+                        className="borrow-tracker-dashboard-grid"
+                        style={dashboardContentGridStyle}
+                    >
+
+                        {/* LEFT SIDE - ALL DEBT FEATURES */}
+
+                        <div>
 
                     {/* SUMMARY */}
 
@@ -867,7 +1066,6 @@ function App() {
                         </div>
 
                     </div>
-
 
                     {/* CREATE / EDIT DEBT */}
 
@@ -1339,6 +1537,303 @@ function App() {
                             })
 
                         )}
+
+                    </div>
+
+
+                        </div>
+
+
+                        {/* RIGHT SIDE - GEMINI AI */}
+
+                        <div
+                            className="borrow-tracker-ai-column"
+                            style={aiColumnStyle}
+                        >
+
+                    {/* GEMINI AI */}
+
+                    <div style={sectionCardStyle}>
+
+                        <h3 style={{ marginTop: 0 }}>
+                            🤖 KADAM AI
+                        </h3>
+
+                        {!geminiConnected ? (
+
+                            <>
+                                <p style={{
+                                    color: "#555",
+                                    lineHeight: "1.6",
+                                    marginTop: 0
+                                }}>
+                                    Connect your own Gemini API key to use
+                                    the AI assistant with your Borrow Tracker data.
+                                </p>
+
+                                <div style={{
+                                    background: "#f8fafc",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: "8px",
+                                    padding: "14px",
+                                    marginBottom: "15px"
+                                }}>
+
+                                    <p style={{
+                                        margin: "0 0 10px",
+                                        fontWeight: "bold"
+                                    }}>
+                                        🔐 Your API key is protected
+                                    </p>
+
+                                    <p style={{
+                                        margin: "0 0 10px",
+                                        color: "#555",
+                                        fontSize: "14px",
+                                        lineHeight: "1.6"
+                                    }}>
+                                        Your Gemini API key is encrypted before
+                                        it is stored on our server. It is not
+                                        displayed back to you after connecting.
+                                    </p>
+
+                                    <p style={{
+                                        margin: 0,
+                                        color: "#555",
+                                        fontSize: "14px",
+                                        lineHeight: "1.6"
+                                    }}>
+                                        The AI currently understands your debt
+                                        data, can summarize who owes whom and
+                                        how much, and can create new debt or
+                                        lending records for you.
+                                    </p>
+
+                                </div>
+
+                                <p style={{
+                                    color: "#666",
+                                    fontSize: "13px",
+                                    lineHeight: "1.5"
+                                }}>
+                                    Your debts remain stored in Borrow Tracker's
+                                    MongoDB database. Gemini does not have a
+                                    separate debt database.
+                                </p>
+<form onSubmit={handleConnectGemini}>
+
+    <input
+        type="password"
+        placeholder="Paste your Gemini API key"
+        value={geminiApiKey}
+        onChange={(e) =>
+            setGeminiApiKey(e.target.value)
+        }
+        style={inputStyle}
+    />
+
+    <button
+        type="submit"
+        disabled={isConnectingGemini}
+        style={{
+            ...primaryButtonStyle,
+            opacity:
+                isConnectingGemini
+                    ? 0.7
+                    : 1,
+            cursor:
+                isConnectingGemini
+                    ? "not-allowed"
+                    : "pointer"
+        }}
+    >
+        {isConnectingGemini
+            ? "Connecting..."
+            : "Connect Gemini"}
+    </button>
+
+    {aiStatus && (
+        <p
+            style={{
+                margin: "10px 0 0",
+                fontSize: "14px",
+                lineHeight: "1.5",
+                color:
+                    aiStatusType === "error"
+                        ? "#dc2626"
+                        : "#16a34a"
+            }}
+        >
+            {aiStatus}
+        </p>
+    )}
+
+</form>
+
+                            </>
+
+                        ) : (
+
+                            <>
+                                <div style={{
+                                    background: "#f0fdf4",
+                                    border: "1px solid #bbf7d0",
+                                    borderRadius: "8px",
+                                    padding: "10px 12px",
+                                    marginBottom: "15px",
+                                    color: "#166534",
+                                    fontSize: "14px"
+                                }}>
+                                    ● Gemini connected
+                                </div>
+
+                                <div style={{
+                                    maxHeight: "350px",
+                                    overflowY: "auto",
+                                    marginBottom: "12px"
+                                }}>
+
+                                    {aiMessages.length === 0 ? (
+
+                                        <div style={{
+                                            background: "#f8fafc",
+                                            borderRadius: "8px",
+                                            padding: "14px",
+                                            color: "#555",
+                                            fontSize: "14px",
+                                            lineHeight: "1.6"
+                                        }}>
+                                            <strong>
+                                                What can I ask?
+                                            </strong>
+
+                                            <p style={{
+                                                marginBottom: "8px"
+                                            }}>
+                                                Try:
+                                            </p>
+
+                                            <p style={{ margin: "5px 0" }}>
+                                                • "How much do I owe in total?"
+                                            </p>
+
+                                            <p style={{ margin: "5px 0" }}>
+                                                • "How much money is owed to me?"
+                                            </p>
+
+                                            <p style={{ margin: "5px 0" }}>
+                                                • "What debts do I have with Rahul?"
+                                            </p>
+
+                                            <p style={{ margin: "5px 0" }}>
+                                                • "I lent Rahul ₹500 for lunch."
+                                            </p>
+
+                                        </div>
+
+                                    ) : (
+
+                                        aiMessages.map((chat, index) => (
+
+                                            <div
+                                                key={index}
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent:
+                                                        chat.role === "user"
+                                                            ? "flex-end"
+                                                            : "flex-start",
+                                                    marginBottom: "10px"
+                                                }}
+                                            >
+
+                                                <div style={{
+                                                    maxWidth: "85%",
+                                                    padding: "10px 13px",
+                                                    borderRadius: "10px",
+                                                    background:
+                                                        chat.role === "user"
+                                                            ? "#2563eb"
+                                                            : "#f1f5f9",
+                                                    color:
+                                                        chat.role === "user"
+                                                            ? "#ffffff"
+                                                            : "#333",
+                                                    lineHeight: "1.5",
+                                                    fontSize: "14px"
+                                                }}>
+                                                    {chat.text}
+                                                </div>
+
+                                            </div>
+
+                                        ))
+
+                                    )}
+
+                                    {isAiLoading && (
+                                        <div style={{
+                                            color: "#666",
+                                            fontSize: "14px",
+                                            padding: "8px"
+                                        }}>
+                                            AI is thinking...
+                                        </div>
+                                    )}
+
+                                </div>
+
+                                <form
+                                    onSubmit={handleAiChat}
+                                    style={{
+                                        display: "flex",
+                                        gap: "8px"
+                                    }}
+                                >
+
+                                    <input
+                                        type="text"
+                                        placeholder="Ask Borrow Tracker AI..."
+                                        value={aiMessage}
+                                        onChange={(e) =>
+                                            setAiMessage(e.target.value)
+                                        }
+                                        style={{
+                                            ...inputStyle,
+                                            marginBottom: 0,
+                                            flex: 1
+                                        }}
+                                        disabled={isAiLoading}
+                                    />
+
+                                    <button
+                                        type="submit"
+                                        disabled={
+                                            isAiLoading ||
+                                            !aiMessage.trim()
+                                        }
+                                        style={{
+                                            ...primaryButtonStyle,
+                                            width: "auto",
+                                            padding: "10px 18px",
+                                            opacity:
+                                                isAiLoading ||
+                                                !aiMessage.trim()
+                                                    ? 0.6
+                                                    : 1
+                                        }}
+                                    >
+                                        Send
+                                    </button>
+
+                                </form>
+
+                            </>
+
+                        )}
+
+                    </div>
+                        </div>
 
                     </div>
 
@@ -2010,8 +2505,21 @@ const dashboardPageStyle = {
 };
 
 const dashboardContainerStyle = {
-    maxWidth: "800px",
-    margin: "0 auto"
+    maxWidth: "1200px",
+    margin: "0 auto",
+    width: "100%"
+};
+
+const dashboardContentGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 2fr) minmax(340px, 1fr)",
+    gap: "25px",
+    alignItems: "start"
+};
+
+const aiColumnStyle = {
+    position: "sticky",
+    top: "20px"
 };
 
 const cardStyle = {

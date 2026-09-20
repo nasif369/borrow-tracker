@@ -52,6 +52,26 @@ resetPasswordVerified: {
     type: Boolean,
     default: false
 },
+geminiApiKey: {
+    encrypted: {
+        type: String,
+        default: null
+    },
+    iv: {
+        type: String,
+        default: null
+    },
+    authTag: {
+        type: String,
+        default: null
+    }
+},
+
+geminiConnected: {
+    type: Boolean,
+    default: false
+}
 });
+
 
 module.exports = mongoose.model("User", userSchema);

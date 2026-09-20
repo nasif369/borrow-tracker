@@ -7,7 +7,8 @@ const User = require("../models/User");
 const PendingUser = require("../models/PendingUser");
 
 const router = express.Router();
-
+const authMiddleware = require("../middleware/authMiddleware");
+const { encrypt } = require("../utils/encryption");
 
 // ===============================
 // GMAIL TRANSPORTER
@@ -678,4 +679,63 @@ router.post("/reset-password", async (req, res) => {
     }
 });
 
+// CONNECT GEMINI API KEY
+// CONNECT GEMINI API KEY
+router.post("/connect-gemini", authMiddleware, async (req, res) => {
+    try {
+        const { apiKey } = req.body;
+
+        if (!apiKey || !apiKey.trim()) {
+            return res.status(400).json({
+                message: "Gemini API key is required"
+            });
+        }
+
+        const cleanApiKey = apiKey.trim();
+
+        const user = await User.findById(req.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        // Test the API key before saving it
+        const { GoogleGenAI } = require("@google/genai");
+
+        const testAI = new GoogleGenAI({
+            apiKey: cleanApiKey
+        });
+
+        await testAI.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: "Reply with only: OK"
+        });
+
+        // API key is valid, so encrypt it before storing
+        const encryptedKey = encrypt(cleanApiKey);
+
+        user.geminiApiKey = {
+            encrypted: encryptedKey.encrypted,
+            iv: encryptedKey.iv,
+            authTag: encryptedKey.authTag
+        };
+
+        user.geminiConnected = true;
+
+        await user.save();
+
+        res.json({
+            message: "Gemini connected successfully."
+        });
+
+    } catch (error) {
+        console.error("Connect Gemini error:", error);
+
+        res.status(400).json({
+            message: "Could not connect to Gemini. If you are sure your API key is correct, please try clicking Connect Gemini again."
+        });
+    }
+});
 module.exports = router;
