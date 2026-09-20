@@ -2,15 +2,30 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 //const nodemailer = require("nodemailer");
-const { Resend } = require("resend");
+//const { Resend } = require("resend");
+const { sendEmail } = require("../utils/gmail");
 
 const User = require("../models/User");
 const PendingUser = require("../models/PendingUser");
 
 const router = express.Router();
+router.get("/gmail", (req, res) => {
+    try {
+        const authUrl = getAuthorizationUrl();
+
+        res.redirect(authUrl);
+
+    } catch (error) {
+        console.error("Gmail authorization error:", error);
+
+        res.status(500).send(
+            "Could not start Gmail authorization."
+        );
+    }
+});
 const authMiddleware = require("../middleware/authMiddleware");
 const { encrypt } = require("../utils/encryption");
-
+const { getAuthorizationUrl } = require("../utils/gmail");
 // ===============================
 // GMAIL TRANSPORTER
 // ===============================
@@ -45,7 +60,7 @@ transporter.verify((error) => {
 
 });
 */
-const resend = new Resend(process.env.RESEND_API_KEY);
+//const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ===============================
 // REGISTER
@@ -137,29 +152,12 @@ router.post("/register", async (req, res) => {
         await pendingUser.save();
 
         try {
-       await resend.emails.send({
-    from: "Borrow Tracker <onboarding@resend.dev>",
-    to: cleanEmail,
-    subject: "Borrow Tracker - Email Verification",
+    await sendEmail(
+    cleanEmail,
+    "Borrow Tracker - Email Verification",
+    `Your Borrow Tracker verification OTP is ${verificationCode}. It expires in 10 minutes. If you did not request this, contact nasiftk5j@gmail.com`
+);
 
-    text: `Your Borrow Tracker verification OTP is ${verificationCode}. It expires in 10 minutes. If you did not request this, contact nasiftk5j@gmail.com`,
-
-    html: `
-        <p>Your Borrow Tracker verification OTP is:</p>
-
-        <h2>${verificationCode}</h2>
-
-        <p>This OTP expires in 10 minutes.</p>
-
-        <p>
-            If you did not request this,
-            contact
-            <a href="mailto:nasiftk5j@gmail.com">
-                nasiftk5j@gmail.com
-            </a>
-        </p>
-    `
-});
             console.log(
                 `Verification OTP sent to ${cleanEmail}`
             );
@@ -231,29 +229,11 @@ router.post("/resend-otp", async (req, res) => {
 
         await pendingUser.save();
 
-    await resend.emails.send({
-    from: "Borrow Tracker <onboarding@resend.dev>",
-    to: cleanEmail,
-    subject: "Borrow Tracker - New Verification OTP",
-
-    text: `Your new Borrow Tracker verification OTP is ${verificationCode}. It expires in 10 minutes. If you did not request this, contact nasiftk5j@gmail.com`,
-
-    html: `
-        <p>Your new Borrow Tracker verification OTP is:</p>
-
-        <h2>${verificationCode}</h2>
-
-        <p>This OTP expires in 10 minutes.</p>
-
-        <p>
-            If you did not request this,
-            contact
-            <a href="mailto:nasiftk5j@gmail.com">
-                nasiftk5j@gmail.com
-            </a>
-        </p>
-    `
-});
+    await sendEmail(
+    cleanEmail,
+    "Borrow Tracker - New Verification OTP",
+    `Your new Borrow Tracker verification OTP is ${verificationCode}. It expires in 10 minutes. If you did not request this, contact nasiftk5j@gmail.com`
+);
         console.log(
             `New verification OTP sent to ${cleanEmail}`
         );
@@ -508,38 +488,11 @@ router.post("/forgot-password", async (req, res) => {
             new Date(Date.now() + 10 * 60 * 1000);
 
         await user.save();
-
-        // Send OTP to registered email
-    await resend.emails.send({
-    from: "Borrow Tracker <onboarding@resend.dev>",
-    to: user.email,
-    subject: "Borrow Tracker - Password Reset OTP",
-
-    text: `Your Borrow Tracker password reset OTP is ${resetCode}. It will expire in 10 minutes.`,
-
-    html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <h2>Borrow Tracker</h2>
-
-            <p>You requested to reset your password.</p>
-
-            <p>Your password reset OTP is:</p>
-
-            <div style="
-                font-size: 32px;
-                font-weight: bold;
-                letter-spacing: 8px;
-                margin: 20px 0;
-            ">
-                ${resetCode}
-            </div>
-
-            <p>This OTP will expire in <strong>10 minutes</strong>.</p>
-
-            <p>If you did not request a password reset, please ignore this email.</p>
-        </div>
-    `
-});
+await sendEmail(
+    user.email,
+    "Borrow Tracker - Password Reset OTP",
+    `Your Borrow Tracker password reset OTP is ${resetCode}. It will expire in 10 minutes.`
+);
 
         // Mask email before sending it to frontend
         const [emailName, emailDomain] =
