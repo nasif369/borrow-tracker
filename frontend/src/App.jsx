@@ -61,6 +61,8 @@ const [aiStatusType, setAiStatusType] = useState("");
 
     // RESTORE LOGIN
     // RESTORE LOGIN
+// RESTORE LOGIN
+// RESTORE LOGIN
 useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
@@ -68,6 +70,33 @@ useEffect(() => {
     if (token && user) {
         setLoggedIn(true);
         fetchDebts(token);
+
+        // CHECK SAVED GEMINI CONNECTION
+        fetch(
+            `${API_URL}/api/auth/gemini-status`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        )
+            .then(async (response) => {
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+
+                setGeminiConnected(
+                    data.connected === true
+                );
+            })
+            .catch((error) => {
+                console.error(
+                    "Gemini status error:",
+                    error
+                );
+            });
     }
 }, []);
 
@@ -150,6 +179,43 @@ const handleConnectGemini = async (e) => {
 
     } finally {
         setIsConnectingGemini(false);
+    }
+};
+const handleDisconnectGemini = async () => {
+    const token = localStorage.getItem("token");
+
+    try {
+        const response = await fetch(
+            `${API_URL}/api/auth/disconnect-gemini`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+            setGeminiConnected(false);
+            setAiMessages([]);
+            setAiMessage("");
+
+            setMessage("Gemini disconnected successfully.");
+            setMessageType("success");
+        } else {
+            setMessage(
+                data.message || "Could not disconnect Gemini."
+            );
+            setMessageType("error");
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        setMessage("Could not connect to the server.");
+        setMessageType("error");
     }
 };
 
@@ -1686,6 +1752,15 @@ const handleConnectGemini = async (e) => {
                                 }}>
                                     ● Gemini connected
                                 </div>
+                                <button
+    onClick={handleDisconnectGemini}
+    style={{
+        ...deleteButtonStyle,
+        marginBottom: "15px"
+    }}
+>
+    Disconnect Gemini
+</button>
 
                                 <div style={{
                                     maxHeight: "350px",

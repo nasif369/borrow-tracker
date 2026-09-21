@@ -706,4 +706,60 @@ router.post("/connect-gemini", authMiddleware, async (req, res) => {
         });
     }
 });
+// DISCONNECT GEMINI API KEY
+router.post("/disconnect-gemini", authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        user.geminiApiKey = {
+            encrypted: null,
+            iv: null,
+            authTag: null
+        };
+
+        user.geminiConnected = false;
+
+        await user.save();
+
+        res.json({
+            message: "Gemini disconnected successfully."
+        });
+
+    } catch (error) {
+        console.error("Disconnect Gemini error:", error);
+
+        res.status(500).json({
+            message: "Could not disconnect Gemini."
+        });
+    }
+});
+// GET GEMINI CONNECTION STATUS
+router.get("/gemini-status", authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        res.json({
+            connected: user.geminiConnected === true
+        });
+
+    } catch (error) {
+        console.error("Gemini status error:", error);
+
+        res.status(500).json({
+            message: "Could not get Gemini status."
+        });
+    }
+});
 module.exports = router;

@@ -194,7 +194,14 @@ IMPORTANT RULES:
   - "they_owe_you" means the other person is the borrower.
 - If something is not available in the provided data, clearly say so.
 - Keep answers clear and practical.
-
+IMPORTANT RESPONSE RULES:
+- Never show MongoDB IDs, Debt IDs, ObjectIds, internal IDs, or other database identifiers to the user.
+- Never mention internal database fields or implementation details.
+- Present debt information in a clean, human-readable structure.
+- Do not expose raw JSON unless specifically requested.
+- Use headings and bullet points for summaries.
+- When listing debts, show the person's name, roll number, amount, description, and status only.
+- Keep responses concise and easy for a normal user to understand.
 CURRENT LOGGED-IN USER:
 Name: ${user.name}
 Roll Number: ${user.rollNumber}
