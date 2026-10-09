@@ -2,6 +2,7 @@ const express = require("express");
 const Debt = require("../models/Debt");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
+const { sendEmail } = require("../utils/gmail");
 
 const router = express.Router();
 
@@ -53,8 +54,10 @@ router.post("/", authMiddleware, async (req, res) => {
             });
         }
 
+
         // I BORROWED
         if (debtType === "borrowed") {
+
             const debt = await Debt.create({
                 borrower: currentUser._id,
                 lender: otherUser._id,
@@ -62,20 +65,68 @@ router.post("/", authMiddleware, async (req, res) => {
                 description: description || ""
             });
 
+            // Send email notification to the lender
+            try {
+                await sendEmail(
+                    otherUser.email,
+                    "New debt added in Borrow Tracker",
+                    `Hi ${otherUser.name},
+
+${currentUser.name} added a new debt record in Borrow Tracker.
+
+Amount: ₹${Number(amount)}
+You: You are owed this money
+Added by: ${currentUser.name}
+Description: ${description || "No description"}
+
+Please log in to Borrow Tracker to view the details.`
+                );
+            } catch (emailError) {
+                console.error(
+                    "New debt email failed:",
+                    emailError.message
+                );
+            }
+
             return res.status(201).json({
                 message: "Debt created successfully",
                 debt
             });
         }
 
+
         // I LENT
         if (debtType === "lent") {
+
             const debt = await Debt.create({
                 borrower: otherUser._id,
                 lender: currentUser._id,
                 amount: Number(amount),
                 description: description || ""
             });
+
+            // Send email notification to the borrower
+            try {
+                await sendEmail(
+                    otherUser.email,
+                    "New debt added in Borrow Tracker",
+                    `Hi ${otherUser.name},
+
+${currentUser.name} added a new debt record in Borrow Tracker.
+
+Amount: ₹${Number(amount)}
+You: You owe ${currentUser.name}
+Added by: ${currentUser.name}
+Description: ${description || "No description"}
+
+Please log in to Borrow Tracker to view the details.`
+                );
+            } catch (emailError) {
+                console.error(
+                    "New debt email failed:",
+                    emailError.message
+                );
+            }
 
             return res.status(201).json({
                 message: "Debt created successfully",
@@ -196,6 +247,7 @@ router.patch("/:id", authMiddleware, async (req, res) => {
             });
         }
 
+
         // I BORROWED
         if (debtType === "borrowed") {
             debt.borrower = currentUser._id;
@@ -276,6 +328,34 @@ router.patch("/:id/request-payment", authMiddleware, async (req, res) => {
 
         await debt.save();
 
+
+        // Send email notification to the lender
+        try {
+            const borrower = await User.findById(debt.borrower);
+            const lender = await User.findById(debt.lender);
+
+            if (lender && borrower) {
+                await sendEmail(
+                    lender.email,
+                    "Payment confirmation requested - Borrow Tracker",
+                    `Hi ${lender.name},
+
+${borrower.name} has marked a debt as paid in Borrow Tracker and is requesting your confirmation.
+
+Amount: ₹${debt.amount}
+Paid by: ${borrower.name}
+Description: ${debt.description || "No description"}
+
+Please log in to Borrow Tracker to confirm the payment.`
+                );
+            }
+        } catch (emailError) {
+            console.error(
+                "Payment request email failed:",
+                emailError.message
+            );
+        }
+
         res.json({
             message: "Payment confirmation requested",
             debt
@@ -321,6 +401,34 @@ router.patch("/:id/confirm-payment", authMiddleware, async (req, res) => {
 
         await debt.save();
 
+
+        // Send email notification to the borrower
+        try {
+            const borrower = await User.findById(debt.borrower);
+            const lender = await User.findById(debt.lender);
+
+            if (borrower && lender) {
+                await sendEmail(
+                    borrower.email,
+                    "Payment confirmed - Borrow Tracker",
+                    `Hi ${borrower.name},
+
+${lender.name} has confirmed your payment in Borrow Tracker.
+
+Amount: ₹${debt.amount}
+Confirmed by: ${lender.name}
+Description: ${debt.description || "No description"}
+
+The debt has now been marked as paid.`
+                );
+            }
+        } catch (emailError) {
+            console.error(
+                "Payment confirmation email failed:",
+                emailError.message
+            );
+        }
+
         res.json({
             message: "Payment confirmed successfully",
             debt
@@ -365,7 +473,44 @@ router.delete("/:id", authMiddleware, async (req, res) => {
             });
         }
 
+
+        // Get both users before deleting the debt
+        const borrower = await User.findById(debt.borrower);
+        const lender = await User.findById(debt.lender);
+        const currentUser = await User.findById(req.userId);
+
+
         await Debt.findByIdAndDelete(req.params.id);
+
+
+        // Send email notification to the other person
+        try {
+            if (borrower && lender && currentUser) {
+
+                const otherUser = borrower._id.equals(req.userId)
+                    ? lender
+                    : borrower;
+
+                await sendEmail(
+                    otherUser.email,
+                    "Debt deleted - Borrow Tracker",
+                    `Hi ${otherUser.name},
+
+${currentUser.name} deleted a debt record in Borrow Tracker.
+
+Amount: ₹${debt.amount}
+Deleted by: ${currentUser.name}
+Description: ${debt.description || "No description"}
+
+Please log in to Borrow Tracker to view your updated debts.`
+                );
+            }
+        } catch (emailError) {
+            console.error(
+                "Debt deletion email failed:",
+                emailError.message
+            );
+        }
 
         res.json({
             message: "Debt deleted successfully"

@@ -63,5 +63,37 @@ router.get("/search", authMiddleware, async (req, res) => {
         });
     }
 });
+//
+// ==================== GET MY PROFILE ====================
+
+router.get("/profile", authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId)
+            .select("-password -geminiApiKey");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        res.json({
+            user: {
+                name: user.name,
+                rollNumber: user.rollNumber,
+                email: user.email,
+                emailVerified: user.emailVerified,
+                geminiConnected: user.geminiConnected
+            }
+        });
+
+    } catch (error) {
+        console.error("Get profile error:", error);
+
+        res.status(500).json({
+            message: "Failed to fetch profile"
+        });
+    }
+});
 
 module.exports = router;

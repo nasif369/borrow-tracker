@@ -7,15 +7,29 @@ const authRoutes = require("./routes/auth");
 const debtRoutes = require("./routes/debt");
 const userRoutes = require("./routes/users");
 const aiRoutes = require("./routes/ai");
+
 const {
-    getGmailClient,
-    SCOPES,
+    getAuthorizationUrl,
     handleOAuthCallback
 } = require("./utils/gmail");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+
+// ==================== GMAIL AUTHORIZATION ====================
+
+app.get("/auth/google", (req, res) => {
+    const url = getAuthorizationUrl();
+
+    res.redirect(url);
+});
+
+
+// ==================== GMAIL OAUTH CALLBACK ====================
+
 app.get("/oauth2callback", async (req, res) => {
     try {
         const { code } = req.query;
@@ -45,14 +59,17 @@ app.get("/oauth2callback", async (req, res) => {
     }
 });
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/debts", debtRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/ai", aiRoutes);
 
+
 app.get("/", (req, res) => {
     res.send("Borrow Tracker Backend is working!");
 });
+
 
 const PORT = process.env.PORT || 5000;
 
