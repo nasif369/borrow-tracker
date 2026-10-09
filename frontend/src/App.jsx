@@ -33,6 +33,12 @@ function App() {
     const [messageType, setMessageType] = useState("");
     const [loggedIn, setLoggedIn] = useState(false);
     const [debts, setDebts] = useState([]);
+    // PROFILE
+const [showProfileMenu, setShowProfileMenu] = useState(false);
+const [profile, setProfile] = useState(null);
+const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+const [showAccountDetails, setShowAccountDetails] = useState(false);
+
         // GEMINI AI
     const [geminiApiKey, setGeminiApiKey] = useState("");
     const [geminiConnected, setGeminiConnected] = useState(false);
@@ -67,10 +73,10 @@ useEffect(() => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
 
-    if (token && user) {
-        setLoggedIn(true);
-        fetchDebts(token);
-
+  if (token && user) {
+    setLoggedIn(true);
+    fetchDebts(token);
+    fetchProfile(token);
         // CHECK SAVED GEMINI CONNECTION
         fetch(
             `${API_URL}/api/auth/gemini-status`,
@@ -620,6 +626,34 @@ const handleDisconnectGemini = async () => {
         setMessage("");
         setMessageType("");
     };
+    // GET MY PROFILE
+const fetchProfile = async (token) => {
+    setIsLoadingProfile(true);
+
+    try {
+        const response = await fetch(
+            `${API_URL}/api/users/profile`,
+            {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+            setProfile(data.user);
+        } else if (response.status === 401) {
+            handleLogout();
+        }
+    } catch (error) {
+        console.error("Profile error:", error);
+    } finally {
+        setIsLoadingProfile(false);
+    }
+};
 
     // GET DEBTS
     const fetchDebts = async (token) => {
@@ -1057,25 +1091,229 @@ const handleDisconnectGemini = async () => {
 
                     {/* HEADER */}
 
-                    <div style={headerCardStyle}>
+                <div
+    style={{
+        ...headerCardStyle,
+        position: "relative"
+    }}
+>
+    <h1 style={titleStyle}>
+        Borrow Tracker
+    </h1>
 
-                        <h1 style={titleStyle}>
-                            Borrow Tracker
-                        </h1>
+    <h2 style={{ margin: "0 0 5px" }}>
+        Welcome, {user.name}!
+    </h2>
 
-                        <h2 style={{ margin: "0 0 5px" }}>
-                            Welcome, {user.name}!
-                        </h2>
+    <p style={{
+        margin: 0,
+        color: "#666"
+    }}>
+        Roll Number: {user.rollNumber}
+    </p>
 
-                        <p style={{
-                            margin: 0,
-                            color: "#666"
-                        }}>
-                            Roll Number: {user.rollNumber}
-                        </p>
+    {/* PROFILE BUTTON */}
+    <button
+        type="button"
+        onClick={() =>
+            setShowProfileMenu((previous) => !previous)
+        }
+        style={{
+            position: "absolute",
+            top: "20px",
+            right: "20px",
+            border: "1px solid #ddd",
+            background: "#ffffff",
+            borderRadius: "8px",
+            padding: "9px 14px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#333"
+        }}
+    >
+        👤 {user.name} ▾
+    </button>
 
-                    </div>
+</div>
+{showProfileMenu && (
+    <div
+        style={{
+            position: "absolute",
+            top: "65px",
+            right: "20px",
+            width: "210px",
+            background: "#ffffff",
+            border: "1px solid #ddd",
+            borderRadius: "10px",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+            padding: "8px",
+            zIndex: 1000
+        }}
+    >
+        <button
+            type="button"
+            onClick={() => {
+                setShowProfileMenu(false);
+                setShowAccountDetails(true);
+                setProfile(null);
+                fetchProfile(localStorage.getItem("token"));
+            }}
+            style={{
+                width: "100%",
+                padding: "11px 12px",
+                border: "none",
+                background: "transparent",
+                textAlign: "left",
+                borderRadius: "7px",
+                cursor: "pointer",
+                fontSize: "14px"
+            }}
+        >
+            Account Details
+        </button>
 
+        <button
+            type="button"
+            style={{
+                width: "100%",
+                padding: "11px 12px",
+                border: "none",
+                background: "transparent",
+                textAlign: "left",
+                borderRadius: "7px",
+                cursor: "pointer",
+                fontSize: "14px"
+            }}
+        >
+            Edit Profile
+        </button>
+
+        <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+                width: "100%",
+                padding: "11px 12px",
+                border: "none",
+                background: "transparent",
+                textAlign: "left",
+                borderRadius: "7px",
+                cursor: "pointer",
+                fontSize: "14px",
+                color: "#dc2626"
+            }}
+        >
+            Logout
+        </button>
+    </div>
+)}
+
+{showAccountDetails && (
+    <div
+        style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2000,
+            padding: "20px"
+        }}
+    >
+        <div
+            style={{
+                width: "100%",
+                maxWidth: "450px",
+                background: "#ffffff",
+                borderRadius: "14px",
+                padding: "25px",
+                boxShadow: "0 15px 40px rgba(0,0,0,0.2)"
+            }}
+        >
+            <h2
+                style={{
+                    margin: "0 0 22px",
+                    fontSize: "22px"
+                }}
+            >
+                Account Details
+            </h2>
+
+            {!profile ? (
+                <p
+                    style={{
+                        color: "#666",
+                        margin: "20px 0"
+                    }}
+                >
+                    Loading account details...
+                </p>
+            ) : (
+                <div
+                    style={{
+                        lineHeight: "1.8",
+                        color: "#333"
+                    }}
+                >
+                    <p style={{ margin: "8px 0" }}>
+                        <strong>Name:</strong> {profile.name}
+                    </p>
+
+                    <p style={{ margin: "8px 0" }}>
+                        <strong>Roll Number:</strong>{" "}
+                        {profile.rollNumber}
+                    </p>
+
+                    <p
+                        style={{
+                            margin: "8px 0",
+                            wordBreak: "break-word"
+                        }}
+                    >
+                        <strong>Email:</strong> {profile.email}
+                    </p>
+
+                    <p style={{ margin: "8px 0" }}>
+                        <strong>Email Verified:</strong>{" "}
+                        {profile.emailVerified ? "Yes" : "No"}
+                    </p>
+
+                    <p style={{ margin: "8px 0" }}>
+                        <strong>Gemini:</strong>{" "}
+                        {profile.geminiConnected
+                            ? "Connected"
+                            : "Not Connected"}
+                    </p>
+                </div>
+            )}
+
+            <button
+                type="button"
+                onClick={() => {
+                    setShowAccountDetails(false);
+                    setProfile(null);
+                }}
+                style={{
+                    marginTop: "20px",
+                    width: "100%",
+                    padding: "11px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    fontSize: "15px",
+                    fontWeight: "600"
+                }}
+            >
+                Close
+            </button>
+        </div>
+    </div>
+)}
+  
 
                     {/* MAIN DASHBOARD CONTENT */}
 
