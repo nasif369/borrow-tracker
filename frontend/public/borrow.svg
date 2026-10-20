@@ -1,0 +1,8 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="16" fill="#2563eb"/>
+  <path d="M18 23h28v25H18z" fill="white" opacity=".95"/>
+  <path d="M18 23l7-8h25l-7 8" fill="#bfdbfe"/>
+  <text x="32" y="41" font-size="21" font-weight="bold"
+        text-anchor="middle" fill="#2563eb">₹</text>
+</svg>
